@@ -100,10 +100,11 @@ class DrawingObject:
      def make_schema (self):
 
           coord_list = sorted(self.drawn_object.keys())
-          low_y,low_x = coord_list[0][0],coord_list[0][1]
+          if coord_list:
+               low_y,low_x = coord_list[0][0],coord_list[0][1]
 
-          for c in coord_list:
-               self.schema[c[0]-low_y,c[1]-low_x] = self.drawn_object[c][1]
+               for c in coord_list:
+                    self.schema[c[0]-low_y,c[1]-low_x] = self.drawn_object[c][1]
 
      def get_schema (self):
 

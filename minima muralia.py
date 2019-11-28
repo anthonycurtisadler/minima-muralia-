@@ -20,17 +20,23 @@ from indexutilities import index_expand
 from randomdirection import find_direction
 from limitedstack import LimitedStack
 from randomdirectionclass import Movement
+from drawingmultiplier import multiplied_draw 
+
 import datetime 
 
 import os
 from globalconstants import EMPTYCHAR, SLASH
 import random
 
+hex_colors = '012345678ABCDEF'
+foreground_color = cycle(hex_colors)
+background_color = cycle(hex_colors)
 
 
-
-help_script = ['F2 = to enter a note']+['F3 = to switch modes']+\
-              ['shift F3 = to switch linetype']+\
+help_script =  ['F1 = to change background color']+ \
+               ['SHIFT F1 = to change foreground color'] + \
+               ['F2 = to enter a note']+['F3 = to switch modes']+\
+               ['shift F3 = to switch linetype']+\
                ['F4 = to contract or extend the workpad']+\
                ['TAB = to toggle through notes']+\
                ['F5 = to move selected objects']+\
@@ -50,12 +56,14 @@ help_script = ['F2 = to enter a note']+['F3 = to switch modes']+\
                ['o =move through workpad']+\
                ['n = automatically cycle through notes']+\
                ['m =set objects in motion/activate conway']+\
-               ['ctrl c = copy']+\
-               ['ctrl v = paste']+\
-               ['ctrl a = screen shot']+\
-               ['ctrl s = save text']+\
-               ['insert = to add note from stack']+\
-               ['delete = to return note from stack']
+               ['ctrl c = copy | ctrl v = paste']+\
+               ['ctrl a = screen shot | ctrl s = save text']+\
+               ['~ + RETURN to clear the workpad']+\
+               ['123456789/!@#$%^&*( to add to vert/hor divisions']+\
+               ['0/9 to reset vert/hor division']+\
+               ['? to switch symmetry for divisions'] + \
+               ['insert/delete = to add/delete note from stack']
+               
 
 
 help_script2 = ['ARROW KEYS = draw object']+\
@@ -1011,6 +1019,13 @@ class EmptyMovingWindow (MovingWindow):
           self.moving_dict = {}
           self.moving_qualities = {}
           self.help = None
+          self.fore_col = next(foreground_color)
+          self.back_col = next(background_color)
+          self.show_colors = self.fore_col + self.back_col
+          self.multiply = None
+          self.vert_divisions = 1
+          self.hor_divisions = 1 
+          
 
 
      def populate (self,dict_object=None,totextlist=None):
@@ -1624,7 +1639,7 @@ class EmptyMovingWindow (MovingWindow):
           
 ##          if not index.startswith('%'):
 ##               return False
-          print('index='+index)
+
           if index in self.object_dict:
 
                if 'c' in self.object_dict[index]:
@@ -1910,7 +1925,7 @@ class EmptyMovingWindow (MovingWindow):
                          
           x_max = curses.COLS
           y_max = curses.LINES
-
+          self.multiply = multiplied_draw(window_height=curses.LINES-10,window_width=curses.COLS-2)
           int(x_max/2)
           stack_dump = False
           moving_object = False
@@ -1962,14 +1977,17 @@ class EmptyMovingWindow (MovingWindow):
                if self.cursor_x < 0 or self.cursor_y > y_max:
                     self.cursor_y = int(y_max/2)
                     self.cursor_moved = True 
-               
+
+               if self.multiply:
+                    mode_to_display = self.multiply.mode
                self.print_to(screen,self.find_object_in(y_coord+self.cursor_y,x_coord+self.cursor_x),length=10,y_pos=1,x_pos=25)
                self.print_to(screen,' '.join(list(sorted(self.object_dict))),length=35,y_pos=1,x_pos=70)
                self.print_to(screen,', '.join(objects_to_move),length=30,y_pos=1,x_pos=36)
                self.print_to(screen,str(len(self.object_dict.keys()))+'/'+str(self.objects_in_stack()),length=21,y_pos=1,x_pos=3)
                self.print_to(screen,'█'*(not not (self.find_object_in(y_coord+2,x_coord+2)) and (self.find_object_in(y_coord+2,x_coord+2) in self.selected)),length=1,y_pos=1,x_pos=1)
-               self.print_to(screen,linetype+' SHIFT+F12 for HELP '+'['+drawing_char+'] '
+               self.print_to(screen,linetype+self.show_colors+' SHIFT+F12 for HELP '+'['+drawing_char+'] '
                              +'CYCLING'*cycling
+                             +' '+str(self.vert_divisions)+'/'+str(self.hor_divisions)+'/'+str(mode_to_display)
                              +' MOVING OBJECTS'*moving_object
                              +' DRAWING'*drawing
                              +' TYPING'*typing
@@ -2076,7 +2094,7 @@ class EmptyMovingWindow (MovingWindow):
                               
                               temp_frame = self.make_rectangle(frame_y_dim,
                                                                frame_x_dim,
-                                                               divider=-1,BOX_CHAR=self.BOX_CHAR_DOUBLE)
+                                                               divider=-1,BOX_CHAR=BOX_CHAR_DOUBLE)
                               drawing_frame.enter_superimposed_object(y_coord=y_coord+self.cursor_y,
                                                                       x_coord=x_coord+self.cursor_x,
                                                                       objectlist=temp_frame)
@@ -2209,9 +2227,19 @@ class EmptyMovingWindow (MovingWindow):
                                              self.cursor_y += y_inc
                                              self.cursor_x += x_inc
 
-                                             drawing_object.add(y_pos=y_coord+self.cursor_y,x_pos=x_coord+self.cursor_x,newchar=drawing_char)
-                                             self.textlist[y_coord+self.cursor_y] = self.textlist[y_coord+self.cursor_y][0:x_coord+self.cursor_x]\
-                                                                          +drawing_char+self.textlist[y_coord+self.cursor_y][x_coord+self.cursor_x+1:]
+                                             if not self.multiply:
+
+                                                  drawing_object.add(y_pos=y_coord+self.cursor_y,x_pos=x_coord+self.cursor_x,newchar=drawing_char)
+                                                  self.textlist[y_coord+self.cursor_y] = self.textlist[y_coord+self.cursor_y][0:x_coord+self.cursor_x]\
+                                                                               +drawing_char+self.textlist[y_coord+self.cursor_y][x_coord+self.cursor_x+1:]
+                                             if self.multiply:
+
+                                                  for point in self.multiply.return_value(y_pos=self.cursor_y,x_pos=self.cursor_x):
+                                                       drawing_object.add(y_pos=y_coord+point[0],x_pos=x_coord+point[1],newchar=drawing_char)
+                                                       self.textlist[y_coord+point[0]] = self.textlist[y_coord+point[0]][0:x_coord+point[1]]\
+                                                                                    +drawing_char+self.textlist[y_coord+point[0]][x_coord+point[1]+1:]
+                                                            
+                                             
 
                                         else:     
                                              
@@ -2252,10 +2280,17 @@ class EmptyMovingWindow (MovingWindow):
                                                      and char_left in [self.BOX_CHAR[x] for x in right_touching]:
                                                        new_char = self.BOX_CHAR['x']
                                                   
-                                                  
-                                                  drawing_object.add(y_pos=y_coord+self.cursor_y,x_pos=x_coord+self.cursor_x,newchar=new_char)
-                                                  self.textlist[y_coord+self.cursor_y] = self.textlist[y_coord+self.cursor_y][0:x_coord+self.cursor_x]\
-                                                                               +new_char+self.textlist[y_coord+self.cursor_y][x_coord+self.cursor_x+1:]
+
+                                                  if not self.multiply:
+                                                       drawing_object.add(y_pos=y_coord+self.cursor_y,x_pos=x_coord+self.cursor_x,newchar=new_char)
+                                                       self.textlist[y_coord+self.cursor_y] = self.textlist[y_coord+self.cursor_y][0:x_coord+self.cursor_x]\
+                                                                                    +new_char+self.textlist[y_coord+self.cursor_y][x_coord+self.cursor_x+1:]
+                                                  else:
+                                                       for point in self.multiply.return_value(y_pos=self.cursor_y,x_pos=self.cursor_x,char=new_char):
+                                                            drawing_object.add(y_pos=y_coord+point[0],x_pos=x_coord+point[1],newchar=point[2])
+                                                            self.textlist[y_coord+point[0]] = self.textlist[y_coord+point[0]][0:x_coord+point[1]]\
+                                                                                         +point[2]+self.textlist[y_coord+point[0]][x_coord+point[1]+1:]
+                                                            
                                                   
                                                   
                                                   
@@ -2283,10 +2318,16 @@ class EmptyMovingWindow (MovingWindow):
                                                        else:
                                                             new_char = self.BOX_CHAR['xu']
 
-                                                  
-                                                  drawing_object.add(y_pos=y_coord+self.cursor_y,x_pos=x_coord+self.cursor_x,newchar=new_char)
-                                                  self.textlist[y_coord+self.cursor_y] = self.textlist[y_coord+self.cursor_y][0:x_coord+self.cursor_x]\
-                                                                               +new_char+self.textlist[y_coord+self.cursor_y][x_coord+self.cursor_x+1:]
+                                                  if not self.multiply:
+                                                       drawing_object.add(y_pos=y_coord+self.cursor_y,x_pos=x_coord+self.cursor_x,newchar=new_char)
+                                                       self.textlist[y_coord+self.cursor_y] = self.textlist[y_coord+self.cursor_y][0:x_coord+self.cursor_x]\
+                                                                                    +new_char+self.textlist[y_coord+self.cursor_y][x_coord+self.cursor_x+1:]
+                                                  else:
+                                                       for point in self.multiply.return_value(y_pos=self.cursor_y,x_pos=self.cursor_x,char=new_char):
+                                                            drawing_object.add(y_pos=y_coord+point[0],x_pos=x_coord+point[1],newchar=point[2])
+                                                            self.textlist[y_coord+point[0]] = self.textlist[y_coord+point[0]][0:x_coord+point[1]]\
+                                                                                         +point[2]+self.textlist[y_coord+point[0]][x_coord+point[1]+1:]
+                                                       
                                                   
                                                  
                                              if key not in [ord('#'),ord('%'),ord('*'),ord('.'),ord('>'),ord(','),ord('<'),287,339,338,358,262,ord('|'),ord('_'),ord('+'),ord('='),curses.KEY_TAB,curses.KEY_BACKSPACE]:
@@ -2807,7 +2848,15 @@ class EmptyMovingWindow (MovingWindow):
                                              
                                     
 
-                                   
+                         elif key == curses.KEY_F1:
+
+                              self.fore_col = next(foreground_color)
+                              os.system('color '+self.fore_col+self.back_col)
+                              self.show_colors = self.fore_col + self.back_col
+                              
+                         elif key == 277: # SHIFT F1
+                              self.back_col = next(background_color)
+                              os.system('color '+self.fore_col+self.back_col)                                     
                                    
 
 
@@ -2917,9 +2966,40 @@ class EmptyMovingWindow (MovingWindow):
                                    self.BOX_CHAR = BOX_CHAR_THICK
                               elif linetype == 'double':
                                    self.BOX_CHAR = BOX_CHAR_DOUBLE
+
+                         elif key in [ord(x) for x in '01234567890!@#$%^&*()']:
+                              key_diff = key - ord('0')
+                              if 0 <= key_diff < 10:
                               
-                                   
-                                   
+                                   if key_diff == 0:
+                                        self.vert_divisions = 1
+                                   else:
+                                        if 0 < key_diff < 10:
+                                             self.vert_divisions += key_diff
+                              else:
+                                   if key in [ord(x) for x in '!@#$%^&*()']:
+                                        key_diff = [ord(x) for x in '!@#$%^&*()'].index(key) + 1
+                                   if key == ord(')'):
+                                        self.hor_divisions = 1
+                                   else:
+                                        self.hor_divisions += key_diff
+                              if self.vert_divisions == 1 and self.hor_divisions == 1:
+                                   self.multiply =  None
+                              if self.multiply:
+                                   self.multiply.divide(self.vert_divisions,self.hor_divisions)
+                         elif key == ord('?'):
+
+                              if self.multiply:
+                                   self.multiply.switch_mode()
+                                   self.multiply.divide(self.vert_divisions,self.hor_divisions)
+                         elif key == ord('~'):
+                              key = screen.getch()
+                              if key == curses.KEY_ENTER or key == 10 or key == 13:
+                                   self.textlist = [' '*self.x_dim]*self.y_dim
+                                   self.object_dict = {}
+                              
+                              
+                          
                          elif key == 288:
                               # shift F12
                               if drawing:
